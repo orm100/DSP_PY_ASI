@@ -1,0 +1,155 @@
+import os
+import pandas as pd
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.sentiment import SentimentIntensityAnalyzer
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+# Ensure required NLTK packages are downloaded
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('vader_lexicon')
+
+def set_working_directory():
+    """Sets the working directory to the script's location."""
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+def preprocess_text(comments):
+    """
+    Tokenizes and cleans the text data by:
+    - Lowercasing
+    - Removing stopwords
+    - Keeping only alphanumeric words
+    
+    Args:
+        comments (pd.Series): A pandas Series containing text data.
+        
+    Returns:
+        list: A list of cleaned and tokenized words.
+    """
+    stop_words = set(stopwords.words('english'))
+    tokens = []
+    for comment in comments:
+        if isinstance(comment, str):  # Check if the comment is a string
+            words = word_tokenize(comment.lower())
+            filtered_words = [word for word in words if word.isalnum() and word not in stop_words]
+            tokens.extend(filtered_words)
+    return tokens
+
+def generate_word_cloud(tokens):
+    """
+    Generates and displays a word cloud from a list of tokens.
+    
+    Args:
+        tokens (list): A list of words.
+    """
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(' '.join(tokens))
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title("Word Cloud of Most Common Words", fontsize=14)
+    plt.show()
+
+def perform_sentiment_analysis(comments):
+    """
+    Performs sentiment analysis on a list of comments.
+    
+    Args:
+        comments (pd.Series): A pandas Series containing text data.
+        
+    Returns:
+        dict: A dictionary with counts of positive, neutral, and negative comments.
+    """
+    sia = SentimentIntensityAnalyzer()
+    sentiments = {'positive': 0, 'neutral': 0, 'negative': 0}
+
+    for comment in comments:
+        if isinstance(comment, str):  # Check if the comment is a string
+            sentiment_score = sia.polarity_scores(comment)
+            if sentiment_score['compound'] > 0.05:
+                sentiments['positive'] += 1
+            elif sentiment_score['compound'] < -0.05:
+                sentiments['negative'] += 1
+            else:
+                sentiments['neutral'] += 1
+    return sentiments
+
+def plot_sentiment_results(sentiments):
+    """
+    Plots a bar chart of sentiment analysis results.
+    
+    Args:
+        sentiments (dict): A dictionary with counts of positive, neutral, and negative comments.
+    """
+    labels = ['Positive', 'Neutral', 'Negative']
+    sizes = [sentiments['positive'], sentiments['neutral'], sentiments['negative']]
+    colors = ['#66b3ff', '#ffcc99', '#ff9999']
+
+    plt.figure(figsize=(8, 6))
+    plt.bar(labels, sizes, color=colors)
+    plt.title("Sentiment Analysis of Comments", fontsize=14)
+    plt.ylabel("Number of Comments")
+    plt.show()
+
+def main():
+    """
+    Main function to run the analysis:
+    - Reads the data file
+    - Preprocesses text
+    - Generates a word cloud
+    - Performs sentiment analysis
+    - Plots sentiment results
+    """
+    # Set the working directory
+    set_working_directory()
+
+    # **USER ACTION REQUIRED**
+    # Update the file path below to the location of your "scrubbed.csv" file
+    file_path = r'C:\Path\To\Your\scrubbed.csv'  # Replace with your actual file path
+
+    # Load the dataset
+    try:
+        data = pd.read_csv(file_path, low_memory=False)
+    except FileNotFoundError:
+        print(f"Error: The file at {file_path} was not found. Please check the file path.")
+        return
+    except Exception as e:
+        print(f"An error occurred while reading the file: {e}")
+        return
+
+    # Extract and clean comments
+    if 'comments' not in data.columns:
+        print("Error: The dataset does not contain a 'comments' column.")
+        return
+
+    comments = data['comments'].dropna()
+    if comments.empty:
+        print("Error: The 'comments' column is empty or contains no valid data.")
+        return
+
+    # Preprocess the text data
+    tokens = preprocess_text(comments)
+
+    # Save word frequency to CSV
+    word_freq = pd.Series(tokens).value_counts()
+    word_freq_file = 'word_frequency.csv'
+    word_freq.to_csv(word_freq_file, header=['Frequency'], index_label='Word')
+    print(f"Word frequency saved to '{word_freq_file}'.")
+
+    # Generate and display the word cloud
+    generate_word_cloud(tokens)
+
+    # Perform sentiment analysis
+    sentiments = perform_sentiment_analysis(comments)
+    print("\nSentiment Analysis Results:")
+    print(f"Positive: {sentiments['positive']}")
+    print(f"Neutral: {sentiments['neutral']}")
+    print(f"Negative: {sentiments['negative']}")
+
+    # Plot sentiment results
+    plot_sentiment_results(sentiments)
+
+if __name__ == "__main__":
+    main()
